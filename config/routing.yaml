@@ -1,0 +1,53 @@
+# ============================================================
+# config/routing.yaml
+# Routing rules — maps intents to agents and defines fallback behaviour.
+# Changing routing = edit this file only, no code changes needed.
+# ============================================================
+
+routing:
+  # Intent → primary agent mapping
+  # Keys must match the "intents" values produced by the Triage Agent.
+  intent_to_agent:
+    billing: billing
+    invoice: billing
+    plan_upgrade: billing
+    plan_downgrade: billing
+    refund: billing
+    payment_failure: billing
+    pricing: billing
+    technical: technical
+    troubleshooting: technical
+    api_support: technical
+    onboarding: technical
+    configuration: technical
+    integrations: technical
+    webhooks: technical
+    alerting: technical
+    sso: technical
+    escalation: escalation
+    human_handoff: escalation
+    general: triage
+    unknown: triage
+
+  # Agent to use when no intent match is found
+  fallback_agent: triage
+
+  # Multi-intent handling strategy:
+  # "sequential" — process each intent one after the other (supported)
+  # "parallel"   — process concurrently (future work, not implemented in prototype)
+  multi_intent_strategy: sequential
+
+  # Seconds to wait for a handover target agent to respond before triggering fallback
+  handover_timeout_seconds: 30
+
+  # Maximum number of agent hops allowed in a single conversation turn
+  # Prevents infinite handover loops
+  max_handover_depth: 3
+
+  # Urgency levels that automatically trigger escalation regardless of routing decision
+  auto_escalate_urgency:
+    - critical
+
+  # Sentiment values that automatically add escalation to secondary_agents
+  auto_escalate_sentiment:
+    - angry
