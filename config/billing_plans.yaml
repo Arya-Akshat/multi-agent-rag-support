@@ -1,0 +1,143 @@
+# ============================================================
+# config/billing_plans.yaml
+# Official CloudDash billing plan catalogue.
+# This is the single source of truth for all pricing and features.
+# The Billing Agent MUST NOT quote any figure not found here.
+# ============================================================
+
+billing_plans:
+  - id: free
+    name: Free
+    price_monthly_usd: 0
+    price_annual_usd: 0
+    billing_cycle_options: [monthly]
+    description: >
+      Perfect for individuals and small experiments. No credit card required.
+    features:
+      dashboards: 1
+      widgets_per_dashboard: 5
+      data_sources: 1
+      cloud_integrations: []
+      alerts: 5
+      alert_channels: [email]
+      data_retention_days: 7
+      api_access: false
+      sso_support: false
+      webhook_support: false
+      team_members: 1
+      support: community
+    limits:
+      api_calls_per_day: 0
+      metrics_per_minute: 100
+      log_ingestion_gb_per_day: 0.5
+    upgrade_path: starter
+    downgrade_path: null
+
+  - id: starter
+    name: Starter
+    price_monthly_usd: 29
+    price_annual_usd: 290  # ~2 months free
+    billing_cycle_options: [monthly, annual]
+    description: >
+      Ideal for small teams monitoring a single cloud environment.
+    features:
+      dashboards: 5
+      widgets_per_dashboard: 20
+      data_sources: 3
+      cloud_integrations: [aws]
+      alerts: 50
+      alert_channels: [email, slack]
+      data_retention_days: 30
+      api_access: true
+      sso_support: false
+      webhook_support: true
+      team_members: 5
+      support: email
+    limits:
+      api_calls_per_day: 10000
+      metrics_per_minute: 1000
+      log_ingestion_gb_per_day: 5
+    upgrade_path: pro
+    downgrade_path: free
+
+  - id: pro
+    name: Pro
+    price_monthly_usd: 99
+    price_annual_usd: 990  # ~2 months free
+    billing_cycle_options: [monthly, annual]
+    description: >
+      For growing teams needing multi-cloud visibility and advanced alerting.
+    features:
+      dashboards: 25
+      widgets_per_dashboard: 100
+      data_sources: 10
+      cloud_integrations: [aws, azure, gcp]
+      alerts: 500
+      alert_channels: [email, slack, pagerduty, webhook]
+      data_retention_days: 90
+      api_access: true
+      sso_support: true
+      webhook_support: true
+      team_members: 25
+      support: priority_email
+    limits:
+      api_calls_per_day: 100000
+      metrics_per_minute: 10000
+      log_ingestion_gb_per_day: 50
+    upgrade_path: enterprise
+    downgrade_path: starter
+
+  - id: enterprise
+    name: Enterprise
+    price_monthly_usd: null   # Custom pricing — contact sales
+    price_annual_usd: null
+    billing_cycle_options: [annual]
+    description: >
+      For large organisations requiring unlimited scale, dedicated support,
+      custom SLAs, and advanced security controls.
+    features:
+      dashboards: unlimited
+      widgets_per_dashboard: unlimited
+      data_sources: unlimited
+      cloud_integrations: [aws, azure, gcp, on_premise, custom]
+      alerts: unlimited
+      alert_channels: [email, slack, pagerduty, webhook, custom]
+      data_retention_days: 365
+      api_access: true
+      sso_support: true
+      webhook_support: true
+      team_members: unlimited
+      support: dedicated_csm
+    limits:
+      api_calls_per_day: unlimited
+      metrics_per_minute: unlimited
+      log_ingestion_gb_per_day: unlimited
+    upgrade_path: null
+    downgrade_path: pro
+
+# ============================================================
+# Refund Policy (referenced by Billing Agent)
+# ============================================================
+refund_policy:
+  new_subscriber_grace_days: 30
+  description: >
+    CloudDash offers a 30-day money-back guarantee for new paid subscribers
+    (Starter or Pro) activating their first subscription. Refunds are not
+    available after 30 days, for plan downgrades, or for Enterprise contracts.
+    To request a refund, contact billing@clouddash.io with your invoice number.
+  exclusions:
+    - Requests after 30 days from first payment
+    - Enterprise plan contracts
+    - Plan downgrade difference refunds
+    - Accounts with usage exceeding 80% of plan limits
+
+# ============================================================
+# Proration Policy
+# ============================================================
+proration_policy:
+  description: >
+    When upgrading mid-cycle, CloudDash charges the prorated difference for
+    the remaining days of the current billing period. When downgrading,
+    the credit is applied to the next billing cycle — no immediate refund.
+  upgrade_immediate: true
+  downgrade_effective: end_of_cycle
