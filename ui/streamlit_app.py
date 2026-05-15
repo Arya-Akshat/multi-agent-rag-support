@@ -116,13 +116,21 @@ else:
         send_message(user_input)
         st.rerun()
 
-# Sidebar Debug Info
+# Sidebar
 with st.sidebar:
+    st.header("🏢 Agent Roster")
+    st.markdown("- **Triage**: Intent Router")
+    st.markdown("- **Technical**: RAG Expert")
+    st.markdown("- **Billing**: Policy & Pricing")
+    st.markdown("- **Escalation**: Human Handoff")
+    
+    st.divider()
+    
     st.header("Debug Info")
-    if st.button("Restart Conversation"):
+    if st.button("Restart Conversation", use_container_width=True):
         st.session_state.conversation_id = None
         st.rerun()
         
     if st.session_state.conversation_id:
-        st.text(f"Session ID:\n{st.session_state.conversation_id[:8]}...")
-        st.text(f"Escalated: {st.session_state.escalated}")
+        st.caption(f"Session ID: {st.session_state.conversation_id[:8]}...")
+        st.caption(f"Escalated: {st.session_state.escalated}")
