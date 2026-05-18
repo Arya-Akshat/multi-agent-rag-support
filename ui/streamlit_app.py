@@ -72,22 +72,42 @@ def send_message(user_text: str):
         st.session_state.escalated = data.get("escalated", False)
         
         # Format response with citations
-        content = data["response"]
-        citations = data.get("citations", [])
-        if citations:
-            content += "\n\n**Sources:**\n"
-            seen_sources = set()
-            for c in citations:
-                source_key = (c['title'], c.get('url', '#'))
-                if source_key not in seen_sources:
-                    seen_sources.add(source_key)
-                    content += f"- [{c['title']}]({c.get('url', '#')})\n"
+        new_msgs = data.get("messages", [])
+        if new_msgs:
+            for m in new_msgs:
+                content = m["content"]
+                citations = m.get("citations", [])
+                if citations:
+                    content += "\n\n**Sources:**\n"
+                    seen_sources = set()
+                    for c in citations:
+                        source_key = (c['title'], c.get('url', '#'))
+                        if source_key not in seen_sources:
+                            seen_sources.add(source_key)
+                            content += f"- [{c['title']}]({c.get('url', '#')})\n"
                 
-        st.session_state.messages.append({
-            "role": "assistant", 
-            "content": content, 
-            "agent": data["agent"]
-        })
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": content,
+                    "agent": m["agent"]
+                })
+        else:
+            content = data["response"]
+            citations = data.get("citations", [])
+            if citations:
+                content += "\n\n**Sources:**\n"
+                seen_sources = set()
+                for c in citations:
+                    source_key = (c['title'], c.get('url', '#'))
+                    if source_key not in seen_sources:
+                        seen_sources.add(source_key)
+                        content += f"- [{c['title']}]({c.get('url', '#')})\n"
+                    
+            st.session_state.messages.append({
+                "role": "assistant", 
+                "content": content, 
+                "agent": data["agent"]
+            })
             
     except Exception as e:
         st.error(f"Error communicating with support server: {e}")

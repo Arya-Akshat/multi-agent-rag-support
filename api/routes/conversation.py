@@ -29,6 +29,7 @@ class MessageResponse(BaseModel):
     escalated: bool
     handovers: List[dict] = []
     citations: List[dict] = []
+    messages: List[dict] = []
 
 @router.post("/start", response_model=StartResponse)
 def start_conversation():
@@ -92,6 +93,7 @@ def send_message(request: MessageRequest):
     
     response_parts = []
     all_citations = []
+    messages_data = []
     for msg in new_assistant_msgs:
         # Run output guardrail per message content based on the issuing agent
         chunks = []
@@ -108,8 +110,26 @@ def send_message(request: MessageRequest):
             session_store.save_session(updated_session)
             
         response_parts.append(msg_content)
+        
+        # Add citations for this specific message block
+        msg_citations = []
         if msg.citations:
             all_citations.extend(msg.citations)
+            for c in msg.citations:
+                msg_citations.append({
+                    "article_id": c.article_id,
+                    "title": c.title,
+                    "snippet": c.snippet,
+                    "url": c.url,
+                    "relevance_score": c.relevance_score
+                })
+                
+        messages_data.append({
+            "role": "assistant",
+            "content": msg_content,
+            "agent": msg.agent_name or "unknown",
+            "citations": msg_citations
+        })
             
     response_content = "\n\n[Automatic Handover]\n\n".join(response_parts) if response_parts else "No response"
             
@@ -143,7 +163,8 @@ def send_message(request: MessageRequest):
         agent=updated_session.current_agent,
         escalated=updated_session.escalated,
         handovers=handovers_data,
-        citations=citations_data
+        citations=citations_data,
+        messages=messages_data
     )
 
 @router.get("/{conversation_id}", response_model=Dict[str, Any])

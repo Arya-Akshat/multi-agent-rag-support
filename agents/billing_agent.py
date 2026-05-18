@@ -39,6 +39,7 @@ class BillingAgent(BaseAgent):
             return "Billing policy unavailable."
 
     def __call__(self, state: ConversationState) -> dict:
+        logger.info("[BILLING] starting execution")
         logger.info(f"Billing agent processing conversation {state.conversation_id}")
         
         last_msg = state.last_user_message
@@ -62,6 +63,9 @@ class BillingAgent(BaseAgent):
                 status="pending",
                 active_intent_query=last_msg
             )
+            
+        active_type = getattr(active_intent, "type", "") or (active_intent.get("type") if isinstance(active_intent, dict) else "")
+        logger.info(f"[BILLING] active_intent={active_type}")
 
         # Format input for the prompt using build_agent_task_context helper
         from agents.context_helper import build_agent_task_context
@@ -75,10 +79,14 @@ class BillingAgent(BaseAgent):
         )
         
         # Invoke LLM
+        logger.info("[BILLING] llm_invoked=True")
         response: BillingResponse = self.invoke_structured(
             prompt_variables={"user_input": user_input},
             response_model=BillingResponse
         )
+        logger.info("[BILLING] response_generated=True")
+        preview = response.response[:60].replace("\n", " ") + "..." if response.response else ""
+        logger.info(f'[BILLING] response_preview="{preview}"')
 
         updates = {}
 
