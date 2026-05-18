@@ -126,3 +126,10 @@ def send_message(request: MessageRequest):
         handovers=handovers_data,
         citations=citations_data
     )
+
+@router.get("/{conversation_id}", response_model=Dict[str, Any])
+def get_conversation(conversation_id: str):
+    session = session_store.get(conversation_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return session.model_dump()

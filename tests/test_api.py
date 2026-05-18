@@ -38,6 +38,13 @@ def test_conversation_flow():
     assert "handovers" in msg_data
     assert "citations" in msg_data
 
+    # 3. Retrieve conversation history
+    response = client.get(f"/api/v1/conversation/{conversation_id}")
+    assert response.status_code == 200
+    history_data = response.json()
+    assert history_data["conversation_id"] == conversation_id
+    assert len(history_data["messages"]) > 0
+
 def test_input_guardrail_blocks_injection():
     # 1. Start Conversation
     response = client.post("/api/v1/conversation/start")
