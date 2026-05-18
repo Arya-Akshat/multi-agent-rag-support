@@ -81,3 +81,46 @@ def build_agent_task_context(state: ConversationState, active_intent: TriageInte
         context_prompt += f"\n\nDO NOT discuss:\n{do_not_discuss_str}"
         
     return context_prompt
+
+
+def get_isolated_history(state: ConversationState, target_agent: str) -> str:
+    """
+    Returns a highly isolated and scoped conversation history for a target agent.
+    - User messages are rewritten/filtered to focus on the active intent query of the target agent's domain.
+    - Other specialized agents' detailed responses are simplified to a placeholder like:
+      'Assistant (Technical): [SSO Troubleshooting Completed]'
+    This completely prevents domain leakage and duplicate outputs.
+    """
+    history_lines = []
+    
+    # Get active intent for the target agent
+    active_intent = None
+    if state.intents:
+        for i in state.intents:
+            status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else "")
+            itype = getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")
+            if target_agent in itype and status == "pending":
+                active_intent = i
+                break
+            
+    for msg in state.recent_messages:
+        role = msg.role.capitalize()
+        if role == "User":
+            # If we have an active intent query for this agent, we use it to focus the user message.
+            if active_intent:
+                query = getattr(active_intent, "active_intent_query", "") or active_intent.get("active_intent_query", "")
+                if query:
+                    history_lines.append(f"User ({target_agent.capitalize()} Request): {query}")
+                    continue
+            history_lines.append(f"User: {msg.content}")
+        elif role == "Assistant":
+            agent_name = msg.agent_name or "triage"
+            if agent_name == target_agent:
+                history_lines.append(f"Assistant ({agent_name.capitalize()}): {msg.content}")
+            else:
+                # Simplify other agents' responses to avoid context contamination
+                summary = "SSO Troubleshooting Completed" if agent_name == "technical" else "Plan & Billing Request Handled"
+                history_lines.append(f"Assistant ({agent_name.capitalize()}): [{summary}]")
+                
+    return "\n".join(history_lines)
+

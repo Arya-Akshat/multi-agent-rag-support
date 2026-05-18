@@ -61,6 +61,10 @@ class BaseAgent:
 
     def format_history(self, state: ConversationState) -> str:
         """Format the conversation history for the prompt context."""
+        if self.name in ["technical", "billing"]:
+            from agents.context_helper import get_isolated_history
+            return get_isolated_history(state, self.name)
+
         history_str = ""
         # Only use the most recent messages to fit context window
         for msg in state.recent_messages:
