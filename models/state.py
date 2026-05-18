@@ -8,6 +8,11 @@ from typing import Any, Optional, TypedDict
 from pydantic import BaseModel, Field
 from models.conversation import Message, HandoverEvent
 
+class TriageIntent(BaseModel):
+    type: str = Field(description="Intent type, e.g. 'technical_support', 'billing_upgrade'")
+    priority: int = Field(default=1)
+    status: str = Field(default="pending")
+
 class ConversationState(BaseModel):
     """The complete, mutable state object for a single conversation session."""
     conversation_id: str = Field(description="Unique conversation identifier (UUID)")
@@ -18,6 +23,7 @@ class ConversationState(BaseModel):
     extracted_entities: dict[str, Any] = Field(default_factory=dict)
     handover_history: list[HandoverEvent] = Field(default_factory=list)
     escalated: bool = Field(default=False)
+    intents: list[TriageIntent] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -42,3 +48,4 @@ class GraphState(TypedDict, total=False):
     extracted_entities: dict[str, Any]
     handover_history: list[HandoverEvent]
     escalated: bool
+    intents: list[TriageIntent]

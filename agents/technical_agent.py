@@ -58,23 +58,54 @@ class TechnicalAgent(BaseAgent):
 
         updates = {}
 
+        # Mark active technical support intent as completed
+        new_intents = [i.model_copy() if hasattr(i, "model_copy") else i for i in state.intents]
+        for idx, i in enumerate(new_intents):
+            status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else "")
+            itype = getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")
+            if "technical" in itype and status == "pending":
+                if hasattr(i, "status"):
+                    i.status = "completed"
+                elif isinstance(i, dict):
+                    new_intents[idx]["status"] = "completed"
+        updates["intents"] = new_intents
+
         # 4. Handle Escalation
         if response.escalate:
-            logger.info("Technical agent escalating to human.")
-            target_agent = "escalation"
-            handover_event = HandoverEvent(
-                source_agent=self.name,
-                target_agent=target_agent,
-                reason=response.escalation_reason or "Escalated by Technical Agent",
-                success=True,
-                trace_id=state.trace_id
-            )
-            updates["current_agent"] = target_agent
-            updates["handover_history"] = [handover_event]
-            return updates
+            # Escalation suppression: if there is a pending billing upgrade, route to billing first
+            # unless there is an explicit request for human or manager.
+            has_pending_billing = any("billing" in (getattr(x, "type", "") or x.get("type", "")) and (getattr(x, "status", "") or x.get("status", "")) == "pending" for x in new_intents)
+            explicit_escalation = "manager" in last_msg.lower() or "human" in last_msg.lower() or "escalate" in last_msg.lower()
+            
+            if not has_pending_billing or explicit_escalation:
+                logger.info("Technical agent escalating to human.")
+                target_agent = "escalation"
+                handover_event = HandoverEvent(
+                    source_agent=self.name,
+                    target_agent=target_agent,
+                    reason=response.escalation_reason or "Escalated by Technical Agent",
+                    success=True,
+                    trace_id=state.trace_id
+                )
+                updates["current_agent"] = target_agent
+                updates["handover_history"] = [handover_event]
+                return updates
 
         # 5. Handle normal response
         logger.info("Technical responding to user.")
+        
+        # Check if we should handover to Billing
+        has_pending_billing = any("billing" in (getattr(x, "type", "") or (x.get("type", "") if isinstance(x, dict) else "")) and (getattr(x, "status", "") or (x.get("status", "") if isinstance(x, dict) else "")) == "pending" for x in new_intents)
+        handovers = []
+        if has_pending_billing:
+            handover_event = HandoverEvent(
+                source_agent=self.name,
+                target_agent="billing",
+                reason="Automatic handover to Billing Agent for plan upgrade.",
+                success=True,
+                trace_id=state.trace_id
+            )
+            handovers.append(handover_event)
         
         used_citations = []
         if response.citations:
@@ -96,5 +127,7 @@ class TechnicalAgent(BaseAgent):
         )
         
         updates["messages"] = [msg]
+        if handovers:
+            updates["handover_history"] = handovers
 
         return updates

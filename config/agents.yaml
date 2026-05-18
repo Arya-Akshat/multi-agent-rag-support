@@ -33,7 +33,13 @@ agents:
 
       Produce EXACTLY this JSON structure (no extra fields, no markdown fences):
       {{
-        "intents": ["<intent1>", "<intent2>"],
+        "intents": [
+          {{
+            "type": "<billing|technical|escalation|onboarding|general|unknown>",
+            "priority": 1,
+            "status": "pending"
+          }}
+        ],
         "entities": {{
           "customer_id": "<string or null>",
           "cloud_provider": "<AWS|Azure|GCP|null>",

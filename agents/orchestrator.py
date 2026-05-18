@@ -14,7 +14,7 @@ from agents.billing_agent import BillingAgent
 from agents.escalation_agent import EscalationAgent
 from agents.technical_agent import TechnicalAgent
 from agents.triage_agent import TriageAgent
-from models.state import ConversationState, Message, HandoverEvent
+from models.state import ConversationState, Message, HandoverEvent, TriageIntent
 from app_logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -26,10 +26,14 @@ logger = get_logger(__name__)
 # LangGraph requires reducers for dicts and lists to know how to merge state
 # updates from nodes into the global state.
 
+def merge_intents(old: List[TriageIntent], new: List[TriageIntent]) -> List[TriageIntent]:
+    """Overwrite/merge intents list."""
+    if not new:
+        return old
+    return new
+
 def merge_messages(old: List[Message], new: List[Message]) -> List[Message]:
     """Append new messages to the existing list."""
-    # new can be a list or a single item depending on how the node returns it,
-    # but we enforced lists in our agents (e.g., updates["messages"] = [msg])
     return old + new
 
 def merge_handovers(old: List[HandoverEvent], new: List[HandoverEvent]) -> List[HandoverEvent]:
@@ -49,6 +53,7 @@ def merge_entities(old: Dict[str, Any], new: Dict[str, Any]) -> Dict[str, Any]:
 # We use TypedDict with Annotated reducers for LangGraph's internal representation,
 # but we map it back and forth to our Pydantic ConversationState at the boundaries.
 
+
 class GraphState(TypedDict):
     conversation_id: str
     trace_id: str
@@ -58,6 +63,7 @@ class GraphState(TypedDict):
     extracted_entities: Annotated[Dict[str, Any], merge_entities]
     handover_history: Annotated[List[HandoverEvent], merge_handovers]
     escalated: bool
+    intents: Annotated[List[TriageIntent], merge_intents]
 
 
 # ---------------------------------------------------------------------------
@@ -68,32 +74,79 @@ def determine_next_node(state: GraphState) -> str:
     """
     Conditional edge function.
     Checks state to decide where to route next.
-    If the agent replied to the user, we end the turn.
+    If there are pending intents in the queue, we route sequentially.
     """
     if state.get("escalated", False):
         return END
 
+    # Get pending intents
+    intents = state.get("intents", [])
+    pending_intents = []
+    for i in intents:
+        status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else None)
+        if status == "pending":
+            pending_intents.append(i)
+    
+    if pending_intents:
+        # Sort pending by priority
+        def get_priority(x):
+            return getattr(x, "priority", 1) or (x.get("priority", 1) if isinstance(x, dict) else 1)
+            
+        pending_intents.sort(key=get_priority)
+        next_intent = pending_intents[0]
+        intent_type = getattr(next_intent, "type", "") or (next_intent.get("type", "") if isinstance(next_intent, dict) else "")
+        
+        # Determine target agent based on intent type
+        target_agent = None
+        if "technical" in intent_type:
+            target_agent = "technical"
+        elif "billing" in intent_type:
+            target_agent = "billing"
+        elif "escalation" in intent_type:
+            target_agent = "escalation"
+            
+        if target_agent is None:
+            logger.info(f"Orchestration: non-routing intent type '{intent_type}'. Ending turn.")
+            return END
+            
+        # Update current agent in state
+        source_agent = state.get("current_agent", "triage")
+        state["current_agent"] = target_agent
+        
+        # If it's a new agent handover, record it
+        if source_agent != target_agent:
+            handover_event = HandoverEvent(
+                source_agent=source_agent,
+                target_agent=target_agent,
+                reason=f"Automatic background handover for pending intent: {intent_type}",
+                success=True,
+                trace_id=state.get("trace_id", "")
+            )
+            if "handover_history" not in state or state["handover_history"] is None:
+                state["handover_history"] = []
+            state["handover_history"] = state["handover_history"] + [handover_event]
+            
+        logger.info(f"Orchestration: routing to next pending intent: {intent_type} -> agent: {target_agent}")
+        return target_agent
+
     target_agent = state.get("current_agent", "triage")
     
     # Check if the last message is from an assistant.
-    # If yes, the turn is over, wait for user input.
+    # If yes and no pending intents remain, the turn is over, wait for user input.
     if state.get("messages"):
         last_msg = state["messages"][-1]
         role = getattr(last_msg, "role", None) or last_msg.get("role")
         if role == "assistant":
             return END
             
-    # If the last message is from the user, we need to route to the target_agent
-    # so they can process it.
+    # If the last message is from the user, we route to the target_agent
     if target_agent == "technical":
         return "technical"
     elif target_agent == "billing":
         return "billing"
     elif target_agent == "escalation":
         return "escalation"
-        
-    # If target_agent is triage, we go to triage. But usually Triage is the entry point.
-    if target_agent == "triage":
+    elif target_agent == "triage":
         return "triage"
         
     return END

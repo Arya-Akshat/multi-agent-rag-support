@@ -6,6 +6,7 @@ parsing for all specialized agents.
 """
 
 import pathlib
+import time
 from typing import Any, Dict, Optional, Type
 
 import yaml
@@ -109,3 +110,6 @@ class BaseAgent:
                 if attempt == max_retries - 1:
                     logger.error("Max retries exceeded.")
                     raise
+                sleep_time = 2 * (attempt + 1)
+                logger.info(f"Rate limit / API error. Sleeping for {sleep_time}s before retry...")
+                time.sleep(sleep_time)

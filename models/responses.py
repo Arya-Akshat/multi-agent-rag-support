@@ -47,11 +47,13 @@ class TriageEntities(BaseModel):
 # ---------------------------------------------------------------------------
 # Triage Agent structured output
 # ---------------------------------------------------------------------------
+from models.state import TriageIntent
+
 class TriageResponse(BaseModel):
     """The complete structured output from the Triage Agent."""
 
-    intents: list[str] = Field(
-        description="List of detected intent labels (e.g. ['billing', 'technical'])"
+    intents: list[TriageIntent] = Field(
+        description="List of detected intents with priority and status"
     )
     entities: TriageEntities
     routing_decision: RoutingDecision

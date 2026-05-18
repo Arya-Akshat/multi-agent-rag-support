@@ -78,40 +78,55 @@ def send_message(request: MessageRequest):
     updated_session = ConversationState(**new_state_dict)
     session_store.save_session(updated_session)
     
-    last_message = updated_session.messages[-1] if updated_session.messages else None
-    response_content = last_message.content if last_message else "No response"
+    # Find all new assistant messages added during this turn
+    user_msg_idx = -1
+    for idx, msg in enumerate(updated_session.messages):
+        if msg.role == "user":
+            user_msg_idx = idx
+            
+    new_assistant_msgs = updated_session.messages[user_msg_idx + 1:]
     
     # 4. Run Output Guardrails (verify pricing or hallucinations against context)
     from guardrails.output_guard import OutputGuard
     output_guard = OutputGuard()
-    chunks = []
-    if last_message and last_message.citations:
-        for c in last_message.citations:
-            chunks.append({"title": c.title, "snippet": c.snippet})
-            
-    guard_result = output_guard.check(response_content, retrieved_chunks=chunks)
-    if not guard_result["passed"]:
-        logger.warning(f"Output guardrail failed for session {request.conversation_id}: {guard_result.get('reason')}")
-        response_content = "I apologize, but I am unable to verify the pricing or policy details for that request. I can escalate this issue to a billing representative for accurate details."
-        if last_message:
-            last_message.content = response_content
+    
+    response_parts = []
+    all_citations = []
+    for msg in new_assistant_msgs:
+        # Run output guardrail per message content based on the issuing agent
+        chunks = []
+        if msg.citations:
+            for c in msg.citations:
+                chunks.append({"title": c.title, "snippet": c.snippet})
+                
+        guard_result = output_guard.check(msg.content, retrieved_chunks=chunks, agent_name=msg.agent_name)
+        msg_content = msg.content
+        if not guard_result["passed"]:
+            logger.warning(f"Output guardrail failed for agent {msg.agent_name} in session {request.conversation_id}: {guard_result.get('reason')}")
+            msg_content = "I apologize, but I am unable to verify the pricing or policy details for that request. I can escalate this issue to a billing representative for accurate details."
+            msg.content = msg_content
             session_store.save_session(updated_session)
+            
+        response_parts.append(msg_content)
+        if msg.citations:
+            all_citations.extend(msg.citations)
+            
+    response_content = "\n\n[Automatic Handover]\n\n".join(response_parts) if response_parts else "No response"
             
     # 5. Extract Citations (deduplicated by article_id)
     citations_data = []
     seen_articles = set()
-    if last_message and last_message.citations:
-        for c in last_message.citations:
-            art_id = c.article_id or c.title
-            if art_id not in seen_articles:
-                seen_articles.add(art_id)
-                citations_data.append({
-                    "article_id": c.article_id,
-                    "title": c.title,
-                    "snippet": c.snippet,
-                    "url": c.url,
-                    "relevance_score": c.relevance_score
-                })
+    for c in all_citations:
+        art_id = c.article_id or c.title
+        if art_id not in seen_articles:
+            seen_articles.add(art_id)
+            citations_data.append({
+                "article_id": c.article_id,
+                "title": c.title,
+                "snippet": c.snippet,
+                "url": c.url,
+                "relevance_score": c.relevance_score
+            })
             
     # 6. Extract New Handovers
     handovers_data = []

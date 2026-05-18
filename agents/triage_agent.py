@@ -38,16 +38,34 @@ class TriageAgent(BaseAgent):
         if response.entities:
             new_entities.update(response.entities.model_dump(exclude_none=True))
 
-        # 2. Determine Routing
-        primary_intent = response.intents[0] if response.intents else "unknown"
-        # We can use the router to validate the intent, or just trust the LLM's primary_agent
-        target_agent = router.get_target_agent(primary_intent, self.name)
-        
-        # Fallback to LLM's choice if router doesn't know the intent
-        if not target_agent:
-             target_agent = response.routing_decision.primary_agent
+        # 2. Save the intents to state
+        intents_list = response.intents or []
+        updates = {
+            "extracted_entities": new_entities,
+            "intents": intents_list
+        }
 
-        updates = {"extracted_entities": new_entities}
+        # 3. Determine Routing based on first pending intent
+        pending = [i for i in intents_list if i.status == "pending"]
+        target_agent = None
+        
+        if pending:
+            # Sort by priority
+            pending.sort(key=lambda x: x.priority)
+            primary_intent_obj = pending[0]
+            primary_intent = primary_intent_obj.type
+            
+            # Map primary_intent to agent name
+            if "technical" in primary_intent:
+                target_agent = "technical"
+            elif "billing" in primary_intent:
+                target_agent = "billing"
+            elif "escalation" in primary_intent:
+                target_agent = "escalation"
+        
+        # Fallback to LLM's explicit choice if target_agent couldn't be determined from intents
+        if not target_agent:
+            target_agent = response.routing_decision.primary_agent
 
         if target_agent and target_agent != self.name:
             logger.info(f"Triage initiating handover to {target_agent}. Reason: {response.routing_decision.reason}")

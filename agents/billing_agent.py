@@ -61,6 +61,18 @@ class BillingAgent(BaseAgent):
 
         updates = {}
 
+        # Mark active billing intent as completed
+        new_intents = [i.model_copy() if hasattr(i, "model_copy") else i for i in state.intents]
+        for idx, i in enumerate(new_intents):
+            status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else "")
+            itype = getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")
+            if "billing" in itype and status == "pending":
+                if hasattr(i, "status"):
+                    i.status = "completed"
+                elif isinstance(i, dict):
+                    new_intents[idx]["status"] = "completed"
+        updates["intents"] = new_intents
+
         # 1. Handle Escalation
         if response.escalate:
             logger.info("Billing agent escalating to human.")
