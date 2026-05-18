@@ -144,17 +144,30 @@ class Retriever:
         # 3. Take final top_k
         final_chunks = fused_chunks[:top_k]
         
-        # 4. Map to Citation objects
-        citations = []
+        # 4. Map to Citation objects and deduplicate by article_id (merging snippets)
+        citations_by_id = {}
         for chunk in final_chunks:
             meta = chunk["metadata"]
-            citations.append(Citation(
-                article_id=meta.get("id", "unknown"),
-                title=meta.get("title", "Untitled Article"),
-                snippet=chunk["content"],
-                relevance_score=chunk.get("relevance_score", 0.0),
-                url=f"https://kb.clouddash.io/articles/{meta.get('id')}"
-            ))
+            art_id = meta.get("id", "unknown")
+            title = meta.get("title", "Untitled Article")
+            snippet = chunk["content"]
+            relevance = chunk.get("relevance_score", 0.0)
+            
+            if art_id in citations_by_id:
+                existing = citations_by_id[art_id]
+                if snippet not in existing.snippet:
+                    existing.snippet += "\n\n" + snippet
+                if relevance > existing.relevance_score:
+                    existing.relevance_score = relevance
+            else:
+                citations_by_id[art_id] = Citation(
+                    article_id=art_id,
+                    title=title,
+                    snippet=snippet,
+                    relevance_score=relevance,
+                    url=f"https://kb.clouddash.io/articles/{art_id}"
+                )
+        citations = list(citations_by_id.values())
             
         logger.info(f"Retrieved {len(citations)} citations.")
         return citations

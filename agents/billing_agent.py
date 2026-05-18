@@ -45,12 +45,33 @@ class BillingAgent(BaseAgent):
         if not last_msg:
             return {"current_agent": "billing"}
 
-        # Format input for the prompt
+        # Extract active billing intent
+        from models.state import TriageIntent
+        active_intent = None
+        for i in state.intents:
+            status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else "")
+            itype = getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")
+            if "billing" in itype and status == "pending":
+                active_intent = i
+                break
+        
+        if not active_intent:
+            active_intent = TriageIntent(
+                type="billing",
+                priority=1,
+                status="pending",
+                active_intent_query=last_msg
+            )
+
+        # Format input for the prompt using build_agent_task_context helper
+        from agents.context_helper import build_agent_task_context
         history = self.format_history(state)
+        task_context = build_agent_task_context(state, active_intent)
+
         user_input = (
             f"Conversation History:\n{history}\n\n"
             f"{self.billing_policy}\n\n"
-            f"Last User Message: {last_msg}"
+            f"{task_context}"
         )
         
         # Invoke LLM
@@ -60,6 +81,19 @@ class BillingAgent(BaseAgent):
         )
 
         updates = {}
+
+        # Track incoming background handover
+        if state.current_agent != self.name:
+            handover_event = HandoverEvent(
+                source_agent=state.current_agent,
+                target_agent=self.name,
+                reason="Automatic background handover for pending billing intent",
+                success=True,
+                trace_id=state.trace_id
+            )
+            updates["current_agent"] = self.name
+            updates["previous_agent"] = state.current_agent
+            updates["handover_history"] = state.handover_history + [handover_event]
 
         # Mark active billing intent as completed
         new_intents = [i.model_copy() if hasattr(i, "model_copy") else i for i in state.intents]
@@ -85,12 +119,25 @@ class BillingAgent(BaseAgent):
                 trace_id=state.trace_id
             )
             updates["current_agent"] = target_agent
-            updates["handover_history"] = [handover_event]
+            updates["handover_history"] = updates.get("handover_history", state.handover_history) + [handover_event]
             return updates
 
         # 2. Handle normal response
         logger.info("Billing responding to user.")
         
+        # Check if we should handover to Technical
+        has_pending_tech = any("technical" in (getattr(x, "type", "") or (x.get("type", "") if isinstance(x, dict) else "")) and (getattr(x, "status", "") or (x.get("status", "") if isinstance(x, dict) else "")) == "pending" for x in new_intents)
+        handovers = []
+        if has_pending_tech:
+            handover_event = HandoverEvent(
+                source_agent=self.name,
+                target_agent="technical",
+                reason="Automatic handover to Technical Agent for SSO troubleshooting.",
+                success=True,
+                trace_id=state.trace_id
+            )
+            handovers.append(handover_event)
+
         msg = Message(
             role="assistant",
             content=response.response,
@@ -103,5 +150,7 @@ class BillingAgent(BaseAgent):
             }
         )
         updates["messages"] = [msg]
+        if handovers:
+            updates["handover_history"] = updates.get("handover_history", state.handover_history) + handovers
 
         return updates

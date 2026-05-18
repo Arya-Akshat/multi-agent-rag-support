@@ -12,6 +12,10 @@ class TriageIntent(BaseModel):
     type: str = Field(description="Intent type, e.g. 'technical_support', 'billing_upgrade'")
     priority: int = Field(default=1)
     status: str = Field(default="pending")
+    active_intent_query: Optional[str] = Field(
+        default=None,
+        description="A standalone, intent-scoped subtask query extracted from the user's message."
+    )
 
 class ConversationState(BaseModel):
     """The complete, mutable state object for a single conversation session."""

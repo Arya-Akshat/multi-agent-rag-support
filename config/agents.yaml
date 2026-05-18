@@ -37,7 +37,8 @@ agents:
           {{
             "type": "<billing|technical|escalation|onboarding|general|unknown>",
             "priority": 1,
-            "status": "pending"
+            "status": "pending",
+            "active_intent_query": "<a standalone, intent-scoped subtask query focusing ONLY on this specific intent. E.g. 'Customer wants to upgrade from Pro to Enterprise' or 'Customer reports unresolved SSO integration issue'>"
           }}
         ],
         "entities": {{

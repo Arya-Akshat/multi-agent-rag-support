@@ -28,8 +28,50 @@ class TechnicalAgent(BaseAgent):
         if not last_msg:
             return {"current_agent": "technical"}
 
-        # 1. RAG Pipeline: Rewrite query and retrieve context
-        rewritten_query = self.query_rewriter.rewrite(state.recent_messages)
+        # Extract active technical support intent
+        from models.state import TriageIntent
+        active_intent = None
+        for i in state.intents:
+            status = getattr(i, "status", None) or (i.get("status") if isinstance(i, dict) else "")
+            itype = getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")
+            if "technical" in itype and status == "pending":
+                active_intent = i
+                break
+        
+        if not active_intent:
+            active_intent = TriageIntent(
+                type="technical",
+                priority=1,
+                status="pending",
+                active_intent_query=last_msg
+            )
+
+        # Scoped active intent query
+        active_query = getattr(active_intent, "active_intent_query", None) or last_msg
+
+        # 1. RAG Pipeline: Rewrite ONLY the active intent query
+        from models.conversation import Message
+        scoped_recent_messages = []
+        user_replaced = False
+        for msg in reversed(state.recent_messages):
+            if msg.role == "user" and not user_replaced:
+                scoped_recent_messages.append(
+                    Message(
+                        role="user",
+                        content=active_query,
+                        agent_name=msg.agent_name,
+                        timestamp=msg.timestamp
+                    )
+                )
+                user_replaced = True
+            else:
+                scoped_recent_messages.append(msg)
+        scoped_recent_messages.reverse()
+        
+        if not user_replaced:
+            scoped_recent_messages.append(Message(role="user", content=active_query))
+
+        rewritten_query = self.query_rewriter.rewrite(scoped_recent_messages)
         citations = []
         kb_context = "No relevant knowledge base articles found."
         
@@ -38,16 +80,15 @@ class TechnicalAgent(BaseAgent):
             if citations:
                 kb_context = "\n\n".join([f"Source: {c.title}\n{c.snippet}" for c in citations])
 
-        # 2. Format input for the prompt
+        # 2. Format input for the prompt using build_agent_task_context helper
+        from agents.context_helper import build_agent_task_context
         history = self.format_history(state)
-        # Pass extracted entities so the agent knows what we already know
-        entities_str = ", ".join([f"{k}: {v}" for k, v in state.extracted_entities.items()]) or "None"
+        task_context = build_agent_task_context(state, active_intent)
         
         user_input = (
             f"Conversation History:\n{history}\n\n"
-            f"Extracted Entities context: {entities_str}\n\n"
             f"Knowledge Base Context:\n{kb_context}\n\n"
-            f"Last User Message: {last_msg}"
+            f"{task_context}"
         )
         
         # 3. Invoke LLM
@@ -57,6 +98,19 @@ class TechnicalAgent(BaseAgent):
         )
 
         updates = {}
+
+        # Track incoming background handover
+        if state.current_agent != self.name:
+            handover_event = HandoverEvent(
+                source_agent=state.current_agent,
+                target_agent=self.name,
+                reason="Automatic background handover for pending technical support intent",
+                success=True,
+                trace_id=state.trace_id
+            )
+            updates["current_agent"] = self.name
+            updates["previous_agent"] = state.current_agent
+            updates["handover_history"] = state.handover_history + [handover_event]
 
         # Mark active technical support intent as completed
         new_intents = [i.model_copy() if hasattr(i, "model_copy") else i for i in state.intents]
@@ -88,7 +142,7 @@ class TechnicalAgent(BaseAgent):
                     trace_id=state.trace_id
                 )
                 updates["current_agent"] = target_agent
-                updates["handover_history"] = [handover_event]
+                updates["handover_history"] = updates.get("handover_history", state.handover_history) + [handover_event]
                 return updates
 
         # 5. Handle normal response

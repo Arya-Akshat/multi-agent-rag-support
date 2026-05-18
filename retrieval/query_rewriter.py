@@ -62,10 +62,15 @@ class QueryRewriter:
         if not recent_messages:
             return ""
 
-        # Extract the very last message. If it's not a user message, we can't rewrite it well.
-        last_msg = recent_messages[-1]
-        if last_msg.role != "user":
-            logger.debug("Last message is not from user. Returning empty string for retrieval.")
+        # Find the last user message in the conversation
+        last_msg = None
+        for msg in reversed(recent_messages):
+            if msg.role == "user":
+                last_msg = msg
+                break
+
+        if not last_msg:
+            logger.debug("No user message found. Returning empty string for retrieval.")
             return ""
 
         # If LLM is not configured, gracefully degrade to just returning the last message
