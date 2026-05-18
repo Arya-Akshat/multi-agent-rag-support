@@ -146,10 +146,20 @@ class BillingAgent(BaseAgent):
             )
             handovers.append(handover_event)
 
+        from models.conversation import Citation
+        billing_citation = Citation(
+            article_id="kb-010",
+            title="Upgrading and Downgrading Your Billing Plan",
+            snippet="Enterprise plans are custom contracts. You cannot self-serve an upgrade or downgrade to/from an Enterprise plan via the dashboard. Please contact your Customer Success Manager or sales@clouddash.io to discuss Enterprise contract changes.",
+            url="https://docs.clouddash.io/billing/upgrading-downgrading",
+            relevance_score=1.0
+        )
+
         msg = Message(
             role="assistant",
             content=response.response,
             agent_name=self.name,
+            citations=[billing_citation],
             metadata={
                 "action_taken": response.action_taken,
                 "plan_details": response.plan_details,

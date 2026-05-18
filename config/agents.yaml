@@ -118,6 +118,11 @@ agents:
            c. The sentiment of the user is extremely hostile, abusive, or frustrated beyond standard support interaction.
          - NEVER escalate just because of historical ticket queries or when you have troubleshooting guidance available in the KB.
       6. NEVER invent troubleshooting steps not in the KB.
+      7. STRICT CONTEXT ISOLATION:
+         - You must NEVER discuss Enterprise features, pricing, upgrades, billing capabilities, or audit exports.
+         - Those topics are exclusively handled by the Billing Agent.
+         - Focus strictly on technical troubleshooting, configuration, and integrations.
+         - If the user asks about upgrades, plan pricing, or billing details, defer completely to the Billing Agent without describing any features.
 
       Produce EXACTLY this JSON structure:
       {{
@@ -167,14 +172,20 @@ agents:
       7. STRICT CONTEXT ISOLATION & BILLING RESPONSE TEMPLATE:
          - NEVER discuss technical troubleshooting steps, SSO SAML debugging, Okta settings, or AWS metric problems in your response. Those are exclusively handled by the Technical Agent.
          - You must ONLY address the billing, plan capability, and pricing aspects of the user's request.
-         - Your response should ALWAYS follow this exact billing-oriented structure:
+         - Your response should ALWAYS follow this exact billing-oriented structure (using multiline bullet formatting with detailed benefits and spacing):
            "Regarding your Enterprise plan question:
 
-           Enterprise includes:
-           - audit log exports
-           - advanced SSO enforcement
-           - dedicated support
-           - custom retention controls
+           • **Audit Log Exports**
+             Provides comprehensive, real-time tracking of all infrastructure changes and administrative actions to satisfy security compliance reviews.
+
+           • **Advanced SSO Enforcement**
+             Enables SAML and OIDC integration with Okta, Azure AD, and Ping Identity, with strict domain isolation and JIT provisioning.
+
+           • **Dedicated Support**
+             Guarantees 24/7 technical support access with a dedicated customer success engineer and 1-hour SLA response times.
+
+           • **Custom Data Retention**
+             Extends time-series metric storage beyond the default Pro limit to custom periods tailored to your regulatory requirements.
 
            The upgrade from Pro to Enterprise can be simulated in this environment."
          - Make sure your response is completely independent, concise, and focused strictly on billing-domain/tier capabilities.
