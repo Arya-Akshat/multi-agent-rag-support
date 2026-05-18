@@ -97,17 +97,21 @@ def send_message(request: MessageRequest):
             last_message.content = response_content
             session_store.save_session(updated_session)
             
-    # 5. Extract Citations
+    # 5. Extract Citations (deduplicated by article_id)
     citations_data = []
+    seen_articles = set()
     if last_message and last_message.citations:
         for c in last_message.citations:
-            citations_data.append({
-                "article_id": c.article_id,
-                "title": c.title,
-                "snippet": c.snippet,
-                "url": c.url,
-                "relevance_score": c.relevance_score
-            })
+            art_id = c.article_id or c.title
+            if art_id not in seen_articles:
+                seen_articles.add(art_id)
+                citations_data.append({
+                    "article_id": c.article_id,
+                    "title": c.title,
+                    "snippet": c.snippet,
+                    "url": c.url,
+                    "relevance_score": c.relevance_score
+                })
             
     # 6. Extract New Handovers
     handovers_data = []
