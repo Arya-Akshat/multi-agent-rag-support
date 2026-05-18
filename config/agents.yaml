@@ -107,8 +107,17 @@ agents:
       1. Ground every statement in retrieved KB articles.
       2. Include article citations (article_id, title) for all claims.
       3. Provide numbered, step-by-step instructions for troubleshooting.
-      4. If retrieved articles do not cover the question, explicitly say so and offer escalation.
-      5. NEVER invent troubleshooting steps not in the KB.
+      4. Historical Tickets / Issues reported last week:
+         - If the user asks about the status of a past ticket or previously reported issue (e.g., "issue reported last week", "ticket status", "is it resolved"), you must explain:
+           "I don't have direct access to historical support tickets in this prototype environment, but based on our SSO troubleshooting knowledge base..."
+         - Do NOT escalate to a human just because you cannot verify historical ticket status. If a relevant KB article exists for the underlying technical topic (e.g., SSO, alerts, AWS integrations), use it to provide guidance and set escalate to false.
+      5. Escalation Rules:
+         - Escalate (set escalate: true) ONLY if:
+           a. The user explicitly requests a human, representative, or manager (e.g. "let me speak to a manager", "human support").
+           b. The underlying technical topic is completely unsupported and not covered by the KB (e.g. custom Azure script help).
+           c. The sentiment of the user is extremely hostile, abusive, or frustrated beyond standard support interaction.
+         - NEVER escalate just because of historical ticket queries or when you have troubleshooting guidance available in the KB.
+      6. NEVER invent troubleshooting steps not in the KB.
 
       Produce EXACTLY this JSON structure:
       {{

@@ -38,7 +38,11 @@ def build_agent_task_context(state: ConversationState, active_intent: TriageInte
         if billing_intents:
             summary_bullets.append("- Customer also interested in Enterprise upgrade later")
             
-        current_task = "Resolve SSO issue." if "sso" in active_query.lower() else f"Resolve technical support issue: '{active_query}'"
+        is_historical = any(x in active_query.lower() for x in ["reported", "ticket", "last week", "yesterday", "previous", "past issue"])
+        if is_historical:
+            current_task = "Explain that you cannot directly verify historical ticket status in this environment, then guide the user through verifying if their SSO integration is successfully working using the KB." if "sso" in active_query.lower() else f"Explain that you cannot directly verify historical tickets in this environment, then guide the user: '{active_query}'"
+        else:
+            current_task = "Resolve SSO issue." if "sso" in active_query.lower() else f"Resolve technical support issue: '{active_query}'"
         do_not_discuss = [
             "pricing",
             "billing",

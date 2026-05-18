@@ -125,7 +125,23 @@ class TechnicalAgent(BaseAgent):
         updates["intents"] = new_intents
 
         # 4. Handle Escalation
-        if response.escalate:
+        should_escalate = response.escalate
+        if should_escalate:
+            # Check for explicit user requests for human/manager
+            explicit_escalation = any(x in last_msg.lower() for x in ["human", "manager", "representative", "escalate", "agent", "person", "speak to"])
+            # Check for zero useful KB docs
+            no_kb_docs = not citations or len(citations) == 0
+            # Check if this is a historical ticket check / reported issue query
+            is_historical_ticket_query = any(x in last_msg.lower() for x in ["reported", "ticket", "last week", "yesterday", "previous issue", "past issue"])
+            
+            if is_historical_ticket_query and not no_kb_docs:
+                logger.info("Historical ticket check with available KB docs. Overriding escalation to False.")
+                should_escalate = False
+            elif not explicit_escalation and not no_kb_docs and response.confidence > 0.5:
+                logger.info("Normal troubleshooting query with available KB docs. Overriding escalation to False.")
+                should_escalate = False
+
+        if should_escalate:
             # Escalation suppression: if there is a pending billing upgrade, route to billing first
             # unless there is an explicit request for human or manager.
             has_pending_billing = any("billing" in (getattr(x, "type", "") or x.get("type", "")) and (getattr(x, "status", "") or x.get("status", "")) == "pending" for x in new_intents)
