@@ -6,10 +6,16 @@
 
 A production-grade, multi-agent AI customer support system built for **CloudDash**, a fictional cloud monitoring SaaS. This project demonstrates advanced **Agentic Orchestration** using LangGraph, **Hybrid RAG** (Vector + Keyword) retrieval, and enterprise-grade **Guardrails**.
 
-## 🔗 Live Deployments
+## 🎥 System Demo
+Watch the multi-agent system, transitions, sequential handovers, and guardrails in action:
+- **[Download / View Demo Video](./demo.mp4)**
 
+## 🔗 Live Deployments
 - **🖥️ Live Frontend (Streamlit Cloud):** [arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app](https://arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app/)
 - **⚡ Live Backend API (Render):** [multi-agent-rag-support.onrender.com](https://multi-agent-rag-support.onrender.com)
+
+> [!NOTE]
+> **Cold Start Warning:** The backend is hosted on a Render free instance. If the service is inactive, it will sleep. Live link testing may require **2-5 minutes** to spin up and become active on first load.
 
 
 ## ✨ Key Features
