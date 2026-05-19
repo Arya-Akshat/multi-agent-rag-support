@@ -1,89 +1,75 @@
-# Multi-Agent RAG Support System (CloudDash)
+# CloudDash Multi-Agent Support Engine
 
-[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-orange.svg)](https://langchain-ai.github.io/langgraph/)
-[![Groq](https://img.shields.io/badge/Inference-Groq-green.svg)](https://groq.com/)
+A multi-agent customer support system built for CloudDash, a fictional cloud infrastructure monitoring platform. The system uses LangGraph to orchestrate state, a hybrid vector/keyword RAG pipeline for retrieval, and robust safety guardrails.
 
-A production-grade, multi-agent AI customer support system built for **CloudDash**, a fictional cloud monitoring SaaS. This project demonstrates advanced **Agentic Orchestration** using LangGraph, **Hybrid RAG** (Vector + Keyword) retrieval, and enterprise-grade **Guardrails**.
+## Live Access
 
-## 🎥 System Demo
-Watch the multi-agent system, transitions, sequential handovers, and guardrails in action:
-- **[Download / View Demo Video](./demo.mp4)**
+* **Web UI (Streamlit):** [arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app](https://arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app/)
+* **Backend API (Render):** [multi-agent-rag-support.onrender.com](https://multi-agent-rag-support.onrender.com)
 
-## 🔗 Live Deployments
-- **🖥️ Live Frontend (Streamlit Cloud):** [arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app](https://arya-akshat-multi-agent-rag-support-uistreamlit-app-pdboh8.streamlit.app/)
-- **⚡ Live Backend API (Render):** [multi-agent-rag-support.onrender.com](https://multi-agent-rag-support.onrender.com)
+> **Render Cold Start:** The backend API runs on a Render free tier instance. If it has gone to sleep due to inactivity, it may take 2-5 minutes to boot on the first request.
 
-> [!NOTE]
-> **Cold Start Warning:** The backend is hosted on a Render free instance. If the service is inactive, it will sleep. Live link testing may require **2-5 minutes** to spin up and become active on first load.
+## System Demo
 
+A walkthrough showing agent transitions, sequential handovers, and guardrails in action is recorded here:
+* **[Download / View Demo Video](./demo.mp4)**
 
-## ✨ Key Features
+## Key Features
 
-- **🧠 Agentic Orchestration**: Uses a central LangGraph state machine to route queries between specialized agents (Triage, Technical, Billing, Escalation).
-- **🔎 Hybrid RAG Pipeline**: Combines dense vector search (ChromaDB) with sparse keyword search (BM25) and uses **Reciprocal Rank Fusion (RRF)** for optimal retrieval.
-- **🛡️ Enterprise Guardrails**: Includes a PII Scrubber to redact sensitive data and a structured output validator to ensure 100% reliable JSON responses.
-- **📈 Intent-Aware Routing**: The Triage Agent extracts intent, sentiment, and urgency to ensure high-priority issues are escalated instantly.
-- **⚡ High Performance**: Powered by **Groq LPUs** for near-instant inference and low latency.
+* **State-Machine Routing (LangGraph)**: Uses a central graph orchestrator to manage state and transition between the specialized agents (Triage, Technical Support, Billing, and Escalation).
+* **Hybrid RAG Pipeline**: Combines dense vector search (ChromaDB) with sparse keyword search (BM25) and merges rankings using Reciprocal Rank Fusion (RRF).
+* **Guardrails**: Intercepts input prompt injections, redacts PII before processing, and runs output checks to verify pricing or feature claims against retrieved sources.
+* **Low Latency**: Built on Groq's API for fast response generation.
 
-## 🚀 Installation
+## Local Setup
 
-1. **Clone the repository:**
+1. **Clone the Repository:**
    ```bash
-   git clone https://github.com/yourusername/multi-agent-rag-support.git
+   git clone https://github.com/Arya-Akshat/multi-agent-rag-support.git
    cd multi-agent-rag-support
    ```
 
-2. **Setup Environment:**
+2. **Configure Environment:**
+   Run the setup script or configure dependencies manually:
    ```bash
    make setup
    ```
 
-3. **Configure API Keys:**
-   Create a `.env` file and add your Groq key:
+3. **Set Up API Keys:**
+   Create a `.env` file in the root directory:
    ```env
-   GROQ_API_KEY="gsk_your_key_here"
+   GROQ_API_KEY="gsk_your_groq_key_here"
    GROQ_MODEL="llama-3.1-8b-instant"
    ```
 
-## 🖥️ Usage
+## Running the Project
 
-1. **Start the API Backend:**
+1. **Start the API server:**
    ```bash
    make run-api
    ```
 
-2. **Start the Streamlit UI:**
+2. **Start the frontend UI:**
    ```bash
    make run-ui
    ```
 
-## 🧪 Testing
+## Testing
 
-Run the full test suite to verify agent logic and retrieval accuracy:
+Run unit and integration tests using pytest:
 ```bash
 make test
 ```
 
-## 🏗️ Architecture
+## Design Decisions
 
-Refer to [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed breakdown of the system design, including Mermaid diagrams and component interaction flows.
+* **Deterministic Graph vs. Autonomous Loops**: Autonomous agent loops are prone to hallucinations, infinite loops, and high token costs. We used a structured state machine (via LangGraph) to control routing transitions explicitly.
+* **Hybrid Search with RRF**: Exact matches (like error codes, metric names, or CLI commands) are often missed by semantic vector searches. Combining BM25 keyword matching with dense ChromaDB vectors ensures both semantic and literal queries retrieve relevant guides.
+* **Declarative Configs**: System prompts, specialist routing schemas, and agent profiles are separated into YAML configuration files in `config/` rather than being hardcoded. This allows quick adjustments to system instructions.
+* **Output Verification**: LLMs frequently hallucinate negative claims (e.g. "We do not support feature X") when the retrieved context simply lacks the answer. The output guardrail validates assertions and rewrites unsupported claims to a standard fallback response.
 
-## 📐 Design Decisions
+## Trade-offs
 
-1. **State Machine Orchestration via LangGraph**: Rather than relying on autonomous agent routing loops which are prone to infinite loops and high latency, we chose LangGraph to build a deterministic state machine. Routing decisions are structured and validated at each step.
-2. **Hybrid RAG (Vector + Keyword Search)**: Combining ChromaDB dense embeddings with BM25 keyword matching ensures that queries containing exact technical keywords (e.g., API names or error codes) are retrieved with high precision while semantic queries are handled by vector search. Reciprocal Rank Fusion (RRF) merges the results.
-3. **Decoupled Configuration**: All agent system prompts, capabilities, and routing schemas are declared externally in `config/*.yaml` files, allowing new agents to be integrated without modifying the orchestrator codebase.
-4. **Input/Output Guardrails**: An input guardrail intercepts security attacks (prompt injection) and scrubs PII before the LLM execution. Output guardrails verify the validity of pricing and policy answers against the context, rewriting unsupported claims.
-
-## ⚖️ Trade-offs
-
-1. **In-Memory Session Store vs. Persistent DB**:
-   * *Trade-off*: We used a thread-safe, TTL-based in-memory store for session states.
-   * *Consequence*: Highly performant and simple for prototyping, but does not scale horizontally. In production, this would be replaced with Redis.
-2. **Local Vector Store (ChromaDB) vs. Hosted Vector DB**:
-   * *Trade-off*: ChromaDB is run locally in-process.
-   * *Consequence*: Simplifies local setup and deployments without external dependencies, but increases container memory footprint and limits horizontal scaling.
-3. **Single LLM Provider (Groq) vs. Multi-Model Failover**:
-   * *Trade-off*: The system is designed primarily around Groq's high-speed inference.
-   * *Consequence*: Extremely low latency (near real-time streaming), but lacks automatic model fallback if the primary API experiences rate limits or outages.
+* **In-Memory Session Store**: To simplify development and local runs, session state and conversation memory are kept in-memory with a TTL mechanism. For production scaling, this would be backed by Redis.
+* **In-Process ChromaDB**: Using ChromaDB in-process removes the need for hosted database infrastructure but increases application memory requirements and limits horizontal scaling.
+* **Single LLM Provider**: We rely on Groq for execution speed, but we lack automatic failover rules to fallback to OpenAI or Anthropic if Groq's API encounters rate limits or downtime.
