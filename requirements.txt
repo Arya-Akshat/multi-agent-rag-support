@@ -1,3 +1,46 @@
-# Frontend dependencies for Streamlit Community Cloud (keeps it under 1GB memory limit)
-streamlit==1.35.0
+# ============================================================
+# CloudDash Multi-Agent Customer Support System
+# Production Dependencies — all versions pinned for reproducibility
+# ============================================================
+
+# --- Web Framework ---
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+
+# --- Data Validation ---
+pydantic==2.7.1
+pydantic-settings==2.2.1
+
+# --- Environment & Config ---
+python-dotenv==1.0.1
+PyYAML==6.0.1
+
+# --- LLM Orchestration ---
+langchain==0.2.1
+langchain-core==0.2.5
+langchain-groq==0.1.4
+langchain-community==0.2.4
+langgraph==0.1.5
+
+# --- Groq Client ---
+groq==0.8.0
+
+# --- Embeddings (sentence-transformers, CPU-only torch) ---
+sentence-transformers==2.7.0
+torch==2.2.0
+
+# --- Vector Store ---
+chromadb==0.5.0
+
+# --- Retrieval ---
+rank-bm25==0.2.2
+
+# --- Logging ---
+loguru==0.7.2
+
+# --- HTTP Client ---
 httpx==0.27.0
+
+# --- Streamlit UI ---
+streamlit==1.35.0
