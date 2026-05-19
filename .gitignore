@@ -83,3 +83,8 @@ coverage.xml
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# ==========================================
+# Local Scratch and Debugging
+# ==========================================
+scratch/
