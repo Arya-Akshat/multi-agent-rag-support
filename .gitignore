@@ -1,28 +1,85 @@
-# Environments
+# ==========================================
+# Environments and Local Credentials
+# ==========================================
 .env
+.env.local
+.env.*.local
 .venv/
 env/
 venv/
 ENV/
+bin/
+lib/
+include/
 
-# Python
+# ==========================================
+# Python Bytecode, Compiles, and Packaging
+# ==========================================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Vector Database (ChromaDB)
+# ==========================================
+# Local Vector Databases (ChromaDB)
+# ==========================================
 chroma_db/
 *.sqlite3
+*.db
 
+# ==========================================
 # Logs and Caches
+# ==========================================
 logs/
 *.log
 .pytest_cache/
+.coverage
+.coverage.*
+.cache
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
 
-# OS generated files
+# ==========================================
+# IDEs and Editors Caches
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.project
+.pydevproject
+.settings/
+
+# ==========================================
+# OS Generated Files
+# ==========================================
 .DS_Store
 .DS_Store?
 ._*
 .Spotlight-V100
 .Trashes
+ehthumbs.db
+Thumbs.db

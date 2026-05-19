@@ -76,6 +76,17 @@ def determine_next_node(state: GraphState) -> str:
     Checks state to decide where to route next.
     If there are pending intents in the queue, we route sequentially.
     """
+    # PART 3: Enforce Billing Handover Assertion
+    if state.get("current_agent") == "technical":
+        intents = state.get("intents", [])
+        has_billing_originally = any("billing" in (getattr(i, "type", "") or (i.get("type", "") if isinstance(i, dict) else "")) for i in intents)
+        if has_billing_originally:
+            assert any(
+                (getattr(intent, "type", None) or (intent.get("type") if isinstance(intent, dict) else "")) in ["billing", "billing_upgrade"]
+                and (getattr(intent, "status", None) or (intent.get("status") if isinstance(intent, dict) else "")) == "pending"
+                for intent in intents
+            ), "Billing intent must remain pending after technical execution!"
+
     if state.get("escalated", False):
         return END
 
@@ -153,25 +164,45 @@ def determine_next_node(state: GraphState) -> str:
 
 # Wrapper functions for the agent classes to match LangGraph node signatures
 def call_triage(state: GraphState):
+    logger.info("[NODE] triage START")
+    print("[NODE] triage START")
     # Convert TypedDict to Pydantic for validation and easy access
     pydantic_state = ConversationState(**state)
     agent = TriageAgent()
-    return agent(pydantic_state)
+    res = agent(pydantic_state)
+    logger.info("[NODE] triage END")
+    print("[NODE] triage END")
+    return res
 
 def call_technical(state: GraphState):
+    logger.info("[NODE] technical START")
+    print("[NODE] technical START")
     pydantic_state = ConversationState(**state)
     agent = TechnicalAgent()
-    return agent(pydantic_state)
+    res = agent(pydantic_state)
+    logger.info("[NODE] technical END")
+    print("[NODE] technical END")
+    return res
 
 def call_billing(state: GraphState):
+    logger.info("[NODE] billing START")
+    print("[NODE] billing START")
     pydantic_state = ConversationState(**state)
     agent = BillingAgent()
-    return agent(pydantic_state)
+    res = agent(pydantic_state)
+    logger.info("[NODE] billing END")
+    print("[NODE] billing END")
+    return res
 
 def call_escalation(state: GraphState):
+    logger.info("[NODE] escalation START")
+    print("[NODE] escalation START")
     pydantic_state = ConversationState(**state)
     agent = EscalationAgent()
-    return agent(pydantic_state)
+    res = agent(pydantic_state)
+    logger.info("[NODE] escalation END")
+    print("[NODE] escalation END")
+    return res
 
 
 # ---------------------------------------------------------------------------

@@ -48,13 +48,20 @@ def send_message(user_text: str):
             "conversation_id": st.session_state.conversation_id,
             "message": user_text
         }
+        import time
+        start_api = time.time()
         
+        print("[UI] request sent")
         with st.spinner("CloudDash AI is thinking..."):
             response = httpx.post(
                 f"{API_BASE_URL}/conversation/message", 
                 json=payload,
                 timeout=60.0
             )
+            
+        elapsed_api = time.time() - start_api
+        print("[UI] response received")
+        print(f"[STREAMLIT DEBUG] API Response time: {elapsed_api:.3f} seconds")
             
         if response.status_code == 400 and "escalated" in response.text:
             st.session_state.escalated = True
@@ -63,6 +70,9 @@ def send_message(user_text: str):
             
         response.raise_for_status()
         data = response.json()
+        print("[UI] response parsed")
+        
+        print(f"[STREAMLIT DEBUG] New messages received: {len(data.get('messages', []))} | Total handovers: {len(data.get('handovers', []))}")
         
         # Display handover toasts if any
         for h in data.get("handovers", []):
@@ -78,7 +88,7 @@ def send_message(user_text: str):
                 content = m["content"]
                 citations = m.get("citations", [])
                 if citations:
-                    content += "\n\n**Sources:**\n"
+                    content += "\n\nSources:\n"
                     seen_sources = set()
                     for c in citations:
                         source_key = (c['title'], c.get('url', '#'))
@@ -95,7 +105,7 @@ def send_message(user_text: str):
             content = data["response"]
             citations = data.get("citations", [])
             if citations:
-                content += "\n\n**Sources:**\n"
+                content += "\n\nSources:\n"
                 seen_sources = set()
                 for c in citations:
                     source_key = (c['title'], c.get('url', '#'))
@@ -125,11 +135,28 @@ if st.session_state.conversation_id is None:
     start_conversation()
 
 # Display Chat History
+last_agent = None
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        if msg["role"] == "assistant" and "agent" in msg:
-            st.caption(f"Agent: {msg['agent'].capitalize()}")
+    if msg["role"] == "user":
+        with st.chat_message("user"):
+            st.markdown(msg["content"])
+        last_agent = None
+    else:
+        agent_name = msg.get("agent", "assistant")
+        if last_agent is not None and last_agent != agent_name:
+            st.markdown(
+                """
+                <div style="margin: 15px 0; border-top: 1px dashed #ccc; border-bottom: 1px dashed #ccc; padding: 6px 0; text-align: center; color: #666; font-size: 0.9em; font-weight: bold;">
+                    [Automatic Handover]
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        with st.chat_message("assistant"):
+            st.markdown(f"**Agent: {agent_name.capitalize()}**")
+            st.markdown("---")
+            st.markdown(msg["content"])
+        last_agent = agent_name
 
 # Chat Input
 if st.session_state.escalated:

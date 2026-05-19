@@ -12,6 +12,9 @@ from memory.session_store import session_store
 from guardrails.pii_scrubber import scrub_pii
 from app_logging.logger import get_logger
 
+import concurrent.futures
+workflow_executor = concurrent.futures.ThreadPoolExecutor(max_workers=20)
+
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/v1/conversation")
 
@@ -69,14 +72,73 @@ def send_message(request: MessageRequest):
     user_msg = Message(role="user", content=scrubbed_message)
     session.messages.append(user_msg)
     
+    # Every new turn must start at triage to classify the new user message
+    session.current_agent = "triage"
+    session.previous_agent = ""
+    
     # Track existing handovers to return only new ones
     existing_handovers_count = len(session.handover_history)
     
     # 3. Invoke LangGraph Orchestrator
     state_dict = session.model_dump()
-    new_state_dict = graph.invoke(state_dict)
+    
+    import traceback
+    import time
+    from datetime import datetime
+    
+    MAX_WORKFLOW_SECONDS = 55
+    
+    logger.info(f"[TRACE] workflow_start={datetime.now().isoformat()}")
+    logger.info(f"[TRACE] {session.current_agent}_start={datetime.now().isoformat()}")
+    
+    print("[TRACE] graph.invoke START")
+    logger.info("[TRACE] graph.invoke START")
+    
+    try:
+        # Submit task to the global workflow_executor instead of using a 'with' context manager
+        # that implicitly waits/joins on timed-out worker threads.
+        future = workflow_executor.submit(graph.invoke, state_dict)
+        try:
+            new_state_dict = future.result(timeout=MAX_WORKFLOW_SECONDS)
+            print("[TRACE] graph.invoke END")
+            logger.info("[TRACE] graph.invoke END")
+        except concurrent.futures.TimeoutError:
+            print("[TIMEOUT] workflow exceeded 30s")
+            logger.error(f"[TIMEOUT] workflow exceeded {MAX_WORKFLOW_SECONDS} seconds!")
+            fallback_msg = Message(
+                role="assistant",
+                content="CloudDash support is temporarily experiencing high latency. Please retry your request.",
+                agent_name=session.current_agent
+            )
+            session.messages.append(fallback_msg)
+            session_store.save_session(session)
+            new_state_dict = session.model_dump()
+    except Exception as e:
+        logger.error(f"[CRITICAL] Runtime error in graph.invoke() on agent '{session.current_agent}': {type(e).__name__}: {e}")
+        logger.error(traceback.format_exc())
+        fallback_msg = Message(
+            role="assistant",
+            content="CloudDash support is temporarily experiencing high latency. Please retry your request.",
+            agent_name=session.current_agent
+        )
+        session.messages.append(fallback_msg)
+        session_store.save_session(session)
+        new_state_dict = session.model_dump()
+        
+    logger.info(f"[TRACE] workflow_end={datetime.now().isoformat()}")
     
     updated_session = ConversationState(**new_state_dict)
+    
+    # Run Centralized Execution Validator before final API response
+    from guardrails.validators import validate_workflow_execution, validate_agent_domain_response, validate_grounding
+    
+    logger.info("[VALIDATOR] starting workflow validation")
+    try:
+        validate_workflow_execution(updated_session)
+        logger.info("[VALIDATOR] workflow validation complete")
+    except Exception as val_err:
+        logger.error(f"[VALIDATOR ERROR] validate_workflow_execution failed: {val_err}")
+    
     session_store.save_session(updated_session)
     
     # Find all new assistant messages added during this turn
@@ -105,9 +167,24 @@ def send_message(request: MessageRequest):
         msg_content = msg.content
         if not guard_result["passed"]:
             logger.warning(f"Output guardrail failed for agent {msg.agent_name} in session {request.conversation_id}: {guard_result.get('reason')}")
-            msg_content = "I apologize, but I am unable to verify the pricing or policy details for that request. I can escalate this issue to a billing representative for accurate details."
-            msg.content = msg_content
-            session_store.save_session(updated_session)
+            if "rewrite" in guard_result:
+                msg_content = guard_result["rewrite"]
+            else:
+                msg_content = "I apologize, but I am unable to verify the pricing or policy details for that request. I can escalate this issue to a billing representative for accurate details."
+        
+        # Double-assurance centralized validation pass
+        try:
+            msg_content = validate_agent_domain_response(msg.agent_name, msg_content)
+        except Exception as domain_err:
+            logger.error(f"[VALIDATOR ERROR] validate_agent_domain_response failed: {domain_err}")
+            
+        try:
+            msg_content = validate_grounding(msg_content, chunks, updated_session.messages[user_msg_idx].content)
+        except Exception as ground_err:
+            logger.error(f"[VALIDATOR ERROR] validate_grounding failed: {ground_err}")
+            
+        msg.content = msg_content
+        session_store.save_session(updated_session)
             
         response_parts.append(msg_content)
         

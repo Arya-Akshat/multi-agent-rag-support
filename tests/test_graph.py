@@ -89,6 +89,111 @@ def test_multi_intent_orchestration():
     assert any(m.agent_name == "billing" for m in assistant_msgs)
     print("Multi-Intent Sequential Orchestration verified successfully!")
 
+def test_scenario_2_complete():
+    print("--- Test A: Scenario 2 Multi-Intent Verification ---")
+    initial_state = {
+        "conversation_id": str(uuid.uuid4()),
+        "trace_id": str(uuid.uuid4()),
+        "messages": [Message(role="user", content="I want to upgrade from Pro to Enterprise, but first can you check if the SSO integration issue I reported last week has been resolved?")],
+        "current_agent": "triage",
+        "previous_agent": "",
+        "extracted_entities": {},
+        "handover_history": [],
+        "escalated": False,
+        "intents": []
+    }
+    
+    state = graph.invoke(initial_state)
+    
+    # Apply centralized validation
+    from models.state import ConversationState
+    from guardrails.validators import validate_workflow_execution
+    pyd_state = ConversationState(**state)
+    validate_workflow_execution(pyd_state)
+    
+    # Assert nodes execution
+    assistant_msgs = [m for m in pyd_state.messages if m.role == "assistant"]
+    assert len(assistant_msgs) == 2, f"Expected exactly 2 assistant messages, got {len(assistant_msgs)}"
+    assert assistant_msgs[0].agent_name == "technical"
+    assert assistant_msgs[1].agent_name == "billing"
+    assert not pyd_state.escalated
+    print("Scenario 2 Complete Integration Test Passed!")
+
+def test_datadog_grounding():
+    print("--- Test B: Datadog Grounding Verification ---")
+    initial_state = {
+        "conversation_id": str(uuid.uuid4()),
+        "trace_id": str(uuid.uuid4()),
+        "messages": [Message(role="user", content="Does CloudDash support integration with Datadog for cross-platform alerting?")],
+        "current_agent": "triage",
+        "previous_agent": "",
+        "extracted_entities": {},
+        "handover_history": [],
+        "escalated": False,
+        "intents": []
+    }
+    
+    state = graph.invoke(initial_state)
+    
+    # Apply centralized validation
+    from models.state import ConversationState
+    from guardrails.validators import validate_workflow_execution
+    pyd_state = ConversationState(**state)
+    validate_workflow_execution(pyd_state)
+    
+    # Assert agent response
+    assistant_msgs = [m for m in pyd_state.messages if m.role == "assistant"]
+    assert len(assistant_msgs) >= 1
+    datadog_res = assistant_msgs[-1].content
+    
+    # Assert no unsupported claim hallucinated
+    assert "CloudDash does not support" not in datadog_res
+    assert "I could not find information about this feature in the CloudDash knowledge base." in datadog_res
+    print("Datadog Grounding Integration Test Passed!")
+
+def test_enterprise_okta_split():
+    print("--- Test C: Enterprise + Okta Split Verification ---")
+    initial_state = {
+        "conversation_id": str(uuid.uuid4()),
+        "trace_id": str(uuid.uuid4()),
+        "messages": [Message(role="user", content="I want to upgrade from Pro to Enterprise to get audit log exports, but first does CloudDash support SSO integration with Okta?")],
+        "current_agent": "triage",
+        "previous_agent": "",
+        "extracted_entities": {},
+        "handover_history": [],
+        "escalated": False,
+        "intents": []
+    }
+    
+    state = graph.invoke(initial_state)
+    
+    # Apply centralized validation
+    from models.state import ConversationState
+    from guardrails.validators import validate_workflow_execution
+    pyd_state = ConversationState(**state)
+    validate_workflow_execution(pyd_state)
+    
+    assistant_msgs = [m for m in pyd_state.messages if m.role == "assistant"]
+    assert len(assistant_msgs) >= 2, f"Expected at least 2 assistant messages, got {len(assistant_msgs)}"
+    
+    tech_msg = next(m for m in assistant_msgs if m.agent_name == "technical")
+    billing_msg = next(m for m in assistant_msgs if m.agent_name == "billing")
+    
+    # Verify technical agent strictly discussed SSO/Okta and omitted billing concepts
+    assert "sso" in tech_msg.content.lower() or "okta" in tech_msg.content.lower()
+    assert "audit log export" not in tech_msg.content.lower()
+    assert "pricing" not in tech_msg.content.lower()
+    
+    # Verify billing agent strictly discussed enterprise/upgrade and omitted SAML troubleshooting/debugging
+    assert "enterprise" in billing_msg.content.lower() or "upgrade" in billing_msg.content.lower()
+    assert "verify idp" not in billing_msg.content.lower()
+    assert "signing certificate" not in billing_msg.content.lower()
+    
+    print("Enterprise + Okta Domain Isolation Split Test Passed!")
+
 if __name__ == "__main__":
     test_graph_orchestrator()
     test_multi_intent_orchestration()
+    test_scenario_2_complete()
+    test_datadog_grounding()
+    test_enterprise_okta_split()
