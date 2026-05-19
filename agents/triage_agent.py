@@ -26,7 +26,11 @@ class TriageAgent(BaseAgent):
             return {"current_agent": "triage"}
 
         history = self.format_history(state)
-        user_input = f"Conversation History:\n{history}\n\nLast Message: {last_msg}"
+        user_input = (
+            f"Conversation History:\n{history}\n\n"
+            f"CRITICAL: Classify the intents for the 'Last Message' below. Focus ONLY on the new request in the Last Message. Do NOT carry over or re-classify intents from the previous conversation history if they have already been addressed.\n\n"
+            f"Last Message: {last_msg}"
+        )
         
         response: TriageResponse = self.invoke_structured(
             prompt_variables={"user_input": user_input},

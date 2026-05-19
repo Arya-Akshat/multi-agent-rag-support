@@ -75,6 +75,7 @@ def send_message(request: MessageRequest):
     # Every new turn must start at triage to classify the new user message
     session.current_agent = "triage"
     session.previous_agent = ""
+    session.intents = []
     
     # Track existing handovers to return only new ones
     existing_handovers_count = len(session.handover_history)
