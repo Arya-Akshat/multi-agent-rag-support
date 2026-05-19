@@ -15,8 +15,11 @@ st.set_page_config(
     layout="centered"
 )
 
-# Constants
-API_BASE_URL = "http://localhost:8000/api/v1"
+import os
+
+# Load API base URL from env variable (fallback to localhost)
+API_HOST = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
+API_BASE_URL = f"{API_HOST}/api/v1"
 
 # Initialize Session State
 if "conversation_id" not in st.session_state:
