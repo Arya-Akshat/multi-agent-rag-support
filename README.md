@@ -68,3 +68,22 @@ make test
 ## 🏗️ Architecture
 
 Refer to [ARCHITECTURE.md](./ARCHITECTURE.md) for a detailed breakdown of the system design, including Mermaid diagrams and component interaction flows.
+
+## 📐 Design Decisions
+
+1. **State Machine Orchestration via LangGraph**: Rather than relying on autonomous agent routing loops which are prone to infinite loops and high latency, we chose LangGraph to build a deterministic state machine. Routing decisions are structured and validated at each step.
+2. **Hybrid RAG (Vector + Keyword Search)**: Combining ChromaDB dense embeddings with BM25 keyword matching ensures that queries containing exact technical keywords (e.g., API names or error codes) are retrieved with high precision while semantic queries are handled by vector search. Reciprocal Rank Fusion (RRF) merges the results.
+3. **Decoupled Configuration**: All agent system prompts, capabilities, and routing schemas are declared externally in `config/*.yaml` files, allowing new agents to be integrated without modifying the orchestrator codebase.
+4. **Input/Output Guardrails**: An input guardrail intercepts security attacks (prompt injection) and scrubs PII before the LLM execution. Output guardrails verify the validity of pricing and policy answers against the context, rewriting unsupported claims.
+
+## ⚖️ Trade-offs
+
+1. **In-Memory Session Store vs. Persistent DB**:
+   * *Trade-off*: We used a thread-safe, TTL-based in-memory store for session states.
+   * *Consequence*: Highly performant and simple for prototyping, but does not scale horizontally. In production, this would be replaced with Redis.
+2. **Local Vector Store (ChromaDB) vs. Hosted Vector DB**:
+   * *Trade-off*: ChromaDB is run locally in-process.
+   * *Consequence*: Simplifies local setup and deployments without external dependencies, but increases container memory footprint and limits horizontal scaling.
+3. **Single LLM Provider (Groq) vs. Multi-Model Failover**:
+   * *Trade-off*: The system is designed primarily around Groq's high-speed inference.
+   * *Consequence*: Extremely low latency (near real-time streaming), but lacks automatic model fallback if the primary API experiences rate limits or outages.
